@@ -1,0 +1,2623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>JS Practice Compiler</title>
+
+    <!-- CodeMirror -->
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.20/codemirror.min.css">
+
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.20/theme/dracula.min.css">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.20/codemirror.min.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.20/mode/javascript/javascript.min.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        :root {
+            /* Modern Dashboard Colors */
+            --bg: #f0f7f6;
+            --panel: #ffffff;
+            --panel2: #f8fafc;
+            --border: #e5f0ef;
+            --text: #0f3f3d;
+            --muted: #749b99;
+            --primary: #127369;
+            --primary-hover: #0c564f;
+            --green: #15803d;
+            --red: #ff6a5c;
+            --yellow: #f5ba14;
+            --input: #f0f7f6;
+            --shadow: 0 4px 15px rgba(0,0,0,0.02);
+            --card-radius: 20px;
+        }
+
+        body.dark {
+            /* Optional dark mode with teal tint */
+            --bg: #0b1110;
+            --panel: #111a19;
+            --panel2: #162422;
+            --border: #1d3330;
+            --text: #e5f0ef;
+            --muted: #749b99;
+            --input: #0b1110;
+            --shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            padding: 10px; /* Outer padding to float the app */
+        }
+
+        button, input {
+            font: inherit;
+        }
+
+        button {
+            cursor: pointer;
+        }
+
+        .app {
+            width: 100%;
+            height: calc(100vh - 20px);
+            display: flex;
+            flex-direction: column;
+            background: var(--bg);
+            border-radius: var(--card-radius);
+            overflow: hidden;
+            /* box-shadow: 0 10px 40px rgba(0,0,0,0.05); */
+        }
+
+        /* =========================
+           HEADER
+        ========================= */
+
+        .header {
+            height: 70px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            background: var(--panel);
+            border-bottom: 1px solid var(--border);
+            border-radius: var(--card-radius);
+            margin-bottom: 10px;
+            box-shadow: var(--shadow);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background: linear-gradient(90deg, #e5f0ef 50%, #0f3f3d 50%);
+            color: transparent; /* hide text to look like icon */
+            font-weight: 900;
+            font-size: 14px;
+            overflow: hidden;
+        }
+
+        .brand-text h1 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .brand-text span {
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn {
+            border: 1px solid var(--border);
+            background: var(--panel);
+            color: var(--text);
+            border-radius: 20px;
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: 500;
+            transition: .2s;
+        }
+
+        .btn:hover {
+            background: var(--panel2);
+            border-color: var(--muted);
+        }
+
+        .btn.primary {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+
+        .btn.primary:hover {
+            background: var(--primary-hover);
+        }
+
+        .btn.success {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+        
+        .btn.success:hover {
+            background: var(--primary-hover);
+        }
+
+        .btn.danger {
+            color: var(--red);
+            border-color: rgba(255,106,92,0.2);
+        }
+
+        .btn.danger:hover {
+            background: rgba(255,106,92,0.1);
+        }
+
+        .btn.small {
+            padding: 6px 12px;
+            font-size: 12px;
+            border-radius: 15px;
+        }
+
+        /* =========================
+           WORKSPACE
+        ========================= */
+
+        .workspace {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            gap: 15px;
+        }
+
+        /* =========================
+           SIDEBAR
+        ========================= */
+
+        .sidebar {
+            width: 320px;
+            min-width: 250px;
+            display: flex;
+            flex-direction: column;
+            background: var(--panel);
+            border-radius: var(--card-radius);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            border: none;
+        }
+
+        .sidebar-top {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .sidebar-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+
+        .sidebar-title strong {
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .count {
+            color: var(--primary);
+            font-size: 12px;
+            background: #e5f0ef;
+            padding: 2px 10px;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+
+        .search {
+            width: 100%;
+            padding: 10px 15px;
+            border-radius: 20px;
+            border: none;
+            background: var(--input);
+            color: var(--text);
+            font-size: 13px;
+            outline: none;
+        }
+
+        .search:focus {
+            outline: 1px solid var(--primary);
+        }
+
+        .program-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+        }
+
+        .program-item {
+            padding: 12px 15px;
+            margin-bottom: 10px;
+            border: 1px solid transparent;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: .2s;
+            background: var(--panel);
+        }
+
+        .program-item:hover {
+            background: var(--bg);
+        }
+
+        .program-item.active {
+            background: #e5f0ef;
+            border-color: #d1e8e6;
+        }
+
+        .program-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: #000000;
+            margin-bottom: 4px;
+        }
+
+        .program-meta {
+            display: flex;
+            justify-content: space-between;
+            color: var(--muted);
+            font-size: 11px;
+        }
+
+        .sidebar-bottom {
+            padding: 15px;
+            border-top: 1px solid var(--border);
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        /* =========================
+           MAIN
+        ========================= */
+
+        .main {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .program-toolbar {
+            height: 60px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 0 20px;
+            background: var(--panel);
+            border-radius: var(--card-radius);
+            box-shadow: var(--shadow);
+        }
+
+        .program-title {
+            flex: 1;
+            padding: 8px 15px;
+            background: transparent;
+            border: none;
+            color: var(--text);
+            font-weight: 600;
+            font-size: 16px;
+            outline: none;
+        }
+
+        .save-status {
+            font-size: 12px;
+            color: var(--muted);
+            white-space: nowrap;
+        }
+
+        /* =========================
+           EDITOR / CONSOLE
+        ========================= */
+
+        .editor-console {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .editor-area {
+            flex: 1;
+            min-height: 150px;
+            position: relative;
+            background: var(--panel);
+            border-radius: var(--card-radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+
+        .CodeMirror {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            height: auto;
+        }
+
+        .CodeMirror-gutters {
+            border-right: 1px solid var(--border);
+            background: var(--panel);
+        }
+
+        .console {
+            height: 280px;
+            min-height: 130px;
+            background: var(--panel);
+            border-radius: var(--card-radius);
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .console-header {
+            height: 45px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            border-bottom: 1px solid var(--border);
+            background: var(--panel);
+        }
+
+        .console-title {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .console-output {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px 20px;
+            font-family: "JetBrains Mono", Consolas, monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            word-break: break-word;
+            background: #fafdfc;
+        }
+
+        body.dark .console-output {
+            background: #0b1110;
+        }
+
+        .console-line {
+            padding: 4px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .console-log { color: var(--text); }
+        .console-error { color: var(--red); }
+        .console-warn { color: var(--yellow); }
+        .console-result { color: var(--primary); font-weight: 600; }
+        .console-info { color: var(--muted); }
+        
+        .console-time {
+            color: var(--muted);
+            margin-right: 10px;
+            font-size: 11px;
+        }
+
+        /* =========================
+           STATUS BAR
+        ========================= */
+
+        .statusbar {
+            height: 45px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            color: var(--muted);
+            background: var(--panel);
+            border-radius: var(--card-radius);
+            font-size: 12px;
+            box-shadow: var(--shadow);
+        }
+
+        .status-left,
+        .status-right {
+            display: flex;
+            gap: 20px;
+        }
+
+        /* =========================
+           MODAL
+        ========================= */
+
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(15, 63, 61, 0.4);
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-backdrop.show {
+            display: flex;
+        }
+
+        .modal {
+            width: min(450px, calc(100% - 30px));
+            background: var(--panel);
+            border: none;
+            border-radius: 24px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+
+        .modal h2 {
+            margin: 0 0 10px;
+            font-size: 20px;
+            color: var(--text);
+        }
+
+        .modal p {
+            margin: 0 0 20px;
+            color: var(--muted);
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .modal input {
+            width: 100%;
+            padding: 12px 15px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: var(--input);
+            color: var(--text);
+            outline: none;
+            font-size: 14px;
+        }
+
+        .modal input:focus {
+            border-color: var(--primary);
+        }
+
+        .modal-actions {
+            margin-top: 25px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        /* =========================
+           EMPTY STATE
+        ========================= */
+
+        .empty {
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 30px;
+            color: var(--muted);
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+            color: var(--primary);
+            opacity: 0.5;
+        }
+
+        .empty h2 {
+            color: var(--text);
+            margin: 0 0 10px;
+            font-size: 18px;
+        }
+
+        .empty p {
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        /* =========================
+           MOBILE
+        ========================= */
+
+        @media (max-width: 800px) {
+            .sidebar { width: 220px; }
+            .header-actions .optional { display: none; }
+            .console { height: 230px; }
+        }
+
+        @media (max-width: 600px) {
+            .sidebar { width: 190px; }
+            .brand-text { display: none; }
+            .program-toolbar { gap: 4px; }
+            .program-title { width: 100px; }
+            .save-status { display: none; }
+            html, body { padding: 0; }
+            .app { height: 100vh; border-radius: 0; }
+            .header, .sidebar, .program-toolbar, .editor-area, .console, .statusbar { border-radius: 0; }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="app">
+
+    <!-- HEADER -->
+    <header class="header">
+
+        <div class="brand">
+            <div class="logo">JS</div>
+
+            <div class="brand-text">
+                <h1>JS Practice Compiler</h1>
+                <span>Write • Run • Save • Resume</span>
+            </div>
+        </div>
+
+        <div class="header-actions">
+
+            <button class="btn success" onclick="runCode()">
+                ▶ Run
+            </button>
+
+            <button class="btn primary" onclick="saveProgram()">
+                💾 Save
+            </button>
+
+            <button class="btn optional" onclick="newProgram()">
+                ＋ New
+            </button>
+
+            <button class="btn optional" onclick="exportJSON()">
+                ↓ JSON
+            </button>
+
+            <button class="btn" onclick="toggleTheme()" title="Toggle theme">
+                ☀
+            </button>
+
+        </div>
+
+    </header>
+
+
+    <!-- WORKSPACE -->
+    <div class="workspace">
+
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+
+            <div class="sidebar-top">
+
+                <div class="sidebar-title">
+                    <strong>My Programs</strong>
+                    <span class="count" id="programCount">0</span>
+                </div>
+
+                <input
+                    id="searchInput"
+                    class="search"
+                    type="text"
+                    placeholder="Search programs..."
+                    oninput="renderProgramList()"
+                >
+
+            </div>
+
+            <div id="programList" class="program-list"></div>
+
+            <div class="sidebar-bottom">
+
+                <button class="btn small" onclick="importJSON()">
+                    ↑ Import
+                </button>
+
+                <button class="btn small" onclick="exportJSON()">
+                    ↓ Export
+                </button>
+
+                <button class="btn small" onclick="openDatabaseFile()">
+                    📂 JSON File
+                </button>
+
+                <button class="btn small" onclick="saveDatabaseFile()">
+                    💾 File Save
+                </button>
+
+                <button class="btn small" onclick="renameProgram()">
+                    ✏ Rename
+                </button>
+
+                <button class="btn small danger" onclick="deleteProgram()">
+                    🗑 Delete
+                </button>
+
+            </div>
+
+        </aside>
+
+
+        <!-- MAIN -->
+        <main class="main">
+
+            <div class="program-toolbar">
+
+                <input
+                    id="programTitle"
+                    class="program-title"
+                    type="text"
+                    placeholder="Program title..."
+                    oninput="markDirty()"
+                >
+
+                <span id="saveStatus" class="save-status">
+                    Ready
+                </span>
+
+                <button class="btn small" onclick="duplicateProgram()">
+                    Duplicate
+                </button>
+
+                <button class="btn small" onclick="downloadJS()">
+                    .js
+                </button>
+
+            </div>
+
+
+            <div class="editor-console">
+
+                <div id="editorArea" class="editor-area">
+                    <textarea id="codeEditor"></textarea>
+                </div>
+
+
+                <section class="console">
+
+                    <div class="console-header">
+
+                        <span class="console-title">
+                            Console
+                        </span>
+
+                        <div>
+                            <button class="btn small" onclick="clearConsole()">
+                                Clear
+                            </button>
+                        </div>
+
+                    </div>
+
+                    <div id="consoleOutput" class="console-output"></div>
+
+                </section>
+
+            </div>
+
+
+            <footer class="statusbar">
+
+                <div class="status-left">
+                    <span id="cursorPosition">Ln 1, Col 1</span>
+                    <span id="charCount">0 chars</span>
+                    <span id="autoSaveIndicator">Auto-save ON</span>
+                </div>
+
+                <div class="status-right">
+                    <span>Ctrl + Enter → Run</span>
+                    <span>Ctrl + S → Save</span>
+                </div>
+
+            </footer>
+
+        </main>
+
+    </div>
+
+</div>
+
+
+<!-- NEW PROGRAM MODAL -->
+
+<div id="newModal" class="modal-backdrop">
+
+    <div class="modal">
+
+        <h2>Create New Program</h2>
+
+        <p>
+            Give your JavaScript practice program a name.
+        </p>
+
+        <input
+            id="newProgramName"
+            type="text"
+            placeholder="Example: Array Practice"
+        >
+
+        <div class="modal-actions">
+
+            <button class="btn" onclick="closeNewModal()">
+                Cancel
+            </button>
+
+            <button class="btn primary" onclick="createProgram()">
+                Create
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- GENERIC MODAL -->
+<div id="customModal" class="modal-backdrop">
+    <div class="modal">
+        <h2 id="customModalTitle">Title</h2>
+        <p id="customModalMessage" style="white-space: pre-wrap;">Message</p>
+        <input id="customModalInput" type="text" style="display:none; margin-bottom: 20px;">
+        <div class="modal-actions">
+            <button id="customModalCancel" class="btn" style="display:none;">Cancel</button>
+            <button id="customModalOk" class="btn primary">OK</button>
+        </div>
+    </div>
+</div>
+
+<!-- HIDDEN FILE INPUT -->
+
+<input
+    id="jsonFileInput"
+    type="file"
+    accept=".json,application/json"
+    style="display:none"
+    onchange="handleJSONImport(event)"
+>
+
+
+<script>
+
+/* ============================================================
+   JS PRACTICE COMPILER
+   ============================================================ */
+
+
+/* ============================================================
+   DATABASE
+   ============================================================ */
+
+const STORAGE_KEY = "js_practice_compiler_database_v1";
+
+let database = {
+    version: 1,
+    app: "JS Practice Compiler",
+    programs: {}
+};
+
+let currentProgramId = null;
+
+let editor;
+
+let databaseFileHandle = null;
+
+let dirty = false;
+
+
+/* ============================================================
+   STARTER PROGRAM
+   ============================================================ */
+
+const starterCode = `// Welcome to JS Practice Compiler 🚀
+
+console.log("Hello JavaScript!");
+
+const numbers = [1, 2, 3, 4, 5];
+
+const doubled = numbers.map(n => n * 2);
+
+console.log("Original:", numbers);
+console.log("Doubled:", doubled);
+`;
+
+
+/* ============================================================
+   INITIALIZE
+   ============================================================ */
+
+document.addEventListener("DOMContentLoaded", () => {
+
+    loadDatabase();
+
+    initializeEditor();
+
+    setupKeyboardShortcuts();
+
+    loadTheme();
+
+    if (Object.keys(database.programs).length === 0) {
+
+        createInitialProgram();
+
+    } else {
+
+        const firstId = Object.keys(database.programs)[0];
+
+        loadProgram(firstId);
+
+    }
+
+    renderProgramList();
+
+});
+
+
+/* ============================================================
+   CODEMIRROR
+   ============================================================ */
+
+function initializeEditor() {
+
+    editor = CodeMirror.fromTextArea(
+        document.getElementById("codeEditor"),
+        {
+            mode: "javascript",
+            theme: document.body.classList.contains("dark")
+                ? "dracula"
+                : "default",
+
+            lineNumbers: true,
+
+            indentUnit: 4,
+
+            tabSize: 4,
+
+            indentWithTabs: false,
+
+            lineWrapping: false,
+
+            autofocus: true,
+
+            extraKeys: {
+                "Ctrl-Enter": function() {
+                    runCode();
+                },
+
+                "Cmd-Enter": function() {
+                    runCode();
+                }
+            }
+        }
+    );
+
+
+    editor.on("change", () => {
+
+        markDirty();
+
+        updateEditorStats();
+
+    });
+
+
+    editor.on("cursorActivity", updateCursorPosition);
+
+}
+
+
+/* ============================================================
+   DATABASE LOAD
+   ============================================================ */
+
+function loadDatabase() {
+
+    try {
+
+        const saved = localStorage.getItem(STORAGE_KEY);
+
+        if (!saved) {
+            return;
+        }
+
+        const parsed = JSON.parse(saved);
+
+        if (
+            parsed &&
+            parsed.programs &&
+            typeof parsed.programs === "object"
+        ) {
+
+            database = parsed;
+
+        }
+
+    } catch (error) {
+
+        console.error("Could not load database:", error);
+
+    }
+
+}
+
+
+/* ============================================================
+   DATABASE SAVE
+   ============================================================ */
+
+function saveDatabaseToLocalStorage() {
+
+    try {
+
+        localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify(database, null, 2)
+        );
+
+    } catch (error) {
+
+        console.error("Could not save database:", error);
+
+        showSaveStatus("Local storage full");
+
+    }
+
+}
+
+
+/* ============================================================
+   CREATE INITIAL PROGRAM
+   ============================================================ */
+
+function createInitialProgram() {
+
+    const id = generateProgramId();
+
+    database.programs[id] = {
+
+        id: id,
+
+        title: "Hello JavaScript",
+
+        language: "javascript",
+
+        code: starterCode,
+
+        createdAt: new Date().toISOString(),
+
+        updatedAt: new Date().toISOString(),
+
+        runCount: 0
+
+    };
+
+    saveDatabaseToLocalStorage();
+
+    currentProgramId = id;
+
+}
+
+
+/* ============================================================
+   PROGRAM ID
+   ============================================================ */
+
+function generateProgramId() {
+
+    let maxNumber = 0;
+
+    Object.keys(database.programs).forEach(id => {
+
+        const match = id.match(/^js_(\d+)$/);
+
+        if (match) {
+
+            maxNumber = Math.max(
+                maxNumber,
+                parseInt(match[1], 10)
+            );
+
+        }
+
+    });
+
+    return "js_" + String(maxNumber + 1).padStart(4, "0");
+
+}
+
+
+/* ============================================================
+   LOAD PROGRAM
+   ============================================================ */
+
+function loadProgram(id) {
+
+    const program = database.programs[id];
+
+    if (!program) {
+        return;
+    }
+
+    currentProgramId = id;
+
+    editor.setValue(program.code || "");
+
+    document.getElementById("programTitle").value =
+        program.title || "Untitled Program";
+
+    dirty = false;
+
+    showSaveStatus("Saved");
+
+    clearConsole();
+
+    renderProgramList();
+
+    updateEditorStats();
+
+}
+
+
+/* ============================================================
+   NEW PROGRAM
+   ============================================================ */
+
+function newProgram() {
+
+    document.getElementById("newProgramName").value = "";
+
+    document.getElementById("newModal")
+        .classList.add("show");
+
+    setTimeout(() => {
+
+        document
+            .getElementById("newProgramName")
+            .focus();
+
+    }, 50);
+
+}
+
+
+function closeNewModal() {
+
+    document.getElementById("newModal")
+        .classList.remove("show");
+
+}
+
+
+function createProgram() {
+
+    const input =
+        document.getElementById("newProgramName");
+
+    const title =
+        input.value.trim() || "Untitled Program";
+
+    const id = generateProgramId();
+
+    database.programs[id] = {
+
+        id: id,
+
+        title: title,
+
+        language: "javascript",
+
+        code: "",
+
+        createdAt: new Date().toISOString(),
+
+        updatedAt: new Date().toISOString(),
+
+        runCount: 0
+
+    };
+
+    saveDatabaseToLocalStorage();
+
+    closeNewModal();
+
+    loadProgram(id);
+
+    renderProgramList();
+
+    editor.focus();
+
+}
+
+
+/* ============================================================
+   SAVE PROGRAM
+   ============================================================ */
+
+function saveProgram() {
+
+    if (!currentProgramId) {
+
+        createInitialProgram();
+
+    }
+
+    const program =
+        database.programs[currentProgramId];
+
+    if (!program) {
+        return;
+    }
+
+    program.title =
+        document.getElementById("programTitle")
+            .value.trim() || "Untitled Program";
+
+    program.code =
+        editor.getValue();
+
+    program.updatedAt =
+        new Date().toISOString();
+
+    saveDatabaseToLocalStorage();
+
+    dirty = false;
+
+    showSaveStatus("Saved just now");
+
+    renderProgramList();
+
+}
+
+
+/* ============================================================
+   AUTO SAVE
+   ============================================================ */
+
+setInterval(() => {
+
+    if (dirty && currentProgramId) {
+
+        saveProgram();
+
+    }
+
+}, 3000);
+
+
+/* ============================================================
+   MARK DIRTY
+   ============================================================ */
+
+function markDirty() {
+
+    if (!currentProgramId) {
+        return;
+    }
+
+    dirty = true;
+
+    showSaveStatus("Unsaved changes");
+
+}
+
+
+/* ============================================================
+   STATUS
+   ============================================================ */
+
+function showSaveStatus(text) {
+
+    document.getElementById("saveStatus")
+        .textContent = text;
+
+}
+
+
+/* ============================================================
+   PROGRAM LIST
+   ============================================================ */
+
+function renderProgramList() {
+
+    const list =
+        document.getElementById("programList");
+
+    const search =
+        document.getElementById("searchInput")
+            .value
+            .trim()
+            .toLowerCase();
+
+    const programs =
+        Object.values(database.programs)
+            .filter(program => {
+
+                if (!search) {
+                    return true;
+                }
+
+                return (
+                    program.title
+                        .toLowerCase()
+                        .includes(search)
+                    ||
+                    program.id
+                        .toLowerCase()
+                        .includes(search)
+                );
+
+            })
+            .sort((a, b) => {
+
+                return new Date(b.updatedAt)
+                    - new Date(a.updatedAt);
+
+            });
+
+
+    document.getElementById("programCount")
+        .textContent =
+        Object.keys(database.programs).length;
+
+
+    if (programs.length === 0) {
+
+        list.innerHTML = `
+            <div class="empty">
+                No programs found.
+            </div>
+        `;
+
+        return;
+
+    }
+
+
+    list.innerHTML = programs.map(program => {
+
+        const active =
+            program.id === currentProgramId
+                ? "active"
+                : "";
+
+        return `
+            <div
+                class="program-item ${active}"
+                onclick="loadProgram('${escapeHTML(program.id)}')"
+            >
+
+                <div class="program-name" style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHTML(program.title)}</span>
+                    <button class="btn danger" onclick="event.stopPropagation(); deleteProgram('${escapeHTML(program.id)}')" style="padding: 4px 6px; font-size: 11px; border:none; background:transparent; display:flex; align-items:center; gap:4px;" title="Delete">
+                        🗑️
+                    </button>
+                </div>
+
+                <div class="program-meta">
+
+                    <span>
+                        ${escapeHTML(program.id)}
+                    </span>
+
+                    <span>
+                        ${formatDate(program.updatedAt)}
+                    </span>
+
+                </div>
+
+            </div>
+        `;
+
+    }).join("");
+
+}
+
+
+/* ============================================================
+   ESCAPE HTML
+   ============================================================ */
+
+function escapeHTML(value) {
+
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+
+}
+
+
+/* ============================================================
+   DATE
+   ============================================================ */
+
+function formatDate(date) {
+
+    if (!date) {
+        return "";
+    }
+
+    const d = new Date(date);
+return d.toLocaleDateString(
+        undefined,
+        {
+            day: "2-digit",
+            month: "short",
+            year: "numeric"
+        }
+    );
+
+}
+
+function showCustomModal({ title, message, type = 'alert', defaultValue = '' }) {
+    return new Promise(resolve => {
+        const modal = document.getElementById('customModal');
+        const titleEl = document.getElementById('customModalTitle');
+        const msgEl = document.getElementById('customModalMessage');
+        const inputEl = document.getElementById('customModalInput');
+        const cancelBtn = document.getElementById('customModalCancel');
+        const okBtn = document.getElementById('customModalOk');
+
+        titleEl.textContent = title;
+        msgEl.textContent = message;
+
+        if (type === 'prompt') {
+            inputEl.style.display = 'block';
+            inputEl.value = defaultValue;
+        } else {
+            inputEl.style.display = 'none';
+        }
+
+        if (type === 'alert') {
+            cancelBtn.style.display = 'none';
+        } else {
+            cancelBtn.style.display = 'inline-block';
+        }
+
+        modal.classList.add('show');
+
+        if (type === 'prompt') {
+            inputEl.focus();
+            inputEl.setSelectionRange(0, inputEl.value.length);
+        }
+
+        const handleEnter = (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                okBtn.click();
+            }
+        };
+
+        if (type === 'prompt') {
+            inputEl.addEventListener('keydown', handleEnter);
+        }
+
+        const cleanup = () => {
+            modal.classList.remove('show');
+            okBtn.onclick = null;
+            cancelBtn.onclick = null;
+            if (type === 'prompt') {
+                inputEl.removeEventListener('keydown', handleEnter);
+            }
+        };
+
+        okBtn.onclick = () => {
+            cleanup();
+            if (type === 'prompt') {
+                resolve(inputEl.value);
+            } else {
+                resolve(true);
+            }
+        };
+
+        cancelBtn.onclick = () => {
+            cleanup();
+            resolve(type === 'prompt' ? null : false);
+        };
+    });
+}
+
+
+/* ============================================================
+   RUN JAVASCRIPT
+   ============================================================ */
+
+function runCode() {
+
+    clearConsole();
+
+    const code = editor.getValue();
+
+    if (!code.trim()) {
+
+        printConsole(
+            "Nothing to run.",
+            "warn"
+        );
+
+        return;
+
+    }
+
+
+    if (currentProgramId) {
+
+        database.programs[currentProgramId].runCount++;
+
+        database.programs[currentProgramId].lastRunAt =
+            new Date().toISOString();
+
+        saveDatabaseToLocalStorage();
+
+    }
+
+
+    printConsole(
+        "▶ Running JavaScript...",
+        "info"
+    );
+
+
+    const originalConsole = {
+
+        log: console.log,
+
+        error: console.error,
+
+        warn: console.warn,
+
+        info: console.info,
+
+        table: console.table
+
+    };
+
+
+    const formatArguments = args => {
+
+        return args.map(arg => {
+
+            if (typeof arg === "string") {
+                return arg;
+            }
+
+            if (typeof arg === "undefined") {
+                return "undefined";
+            }
+
+            if (typeof arg === "function") {
+                return arg.toString();
+            }
+
+            try {
+
+                return JSON.stringify(
+                    arg,
+                    null,
+                    2
+                );
+
+            } catch {
+
+                return String(arg);
+
+            }
+
+        }).join(" ");
+
+    };
+
+
+    console.log = (...args) => {
+
+        printConsole(
+            formatArguments(args),
+            "log"
+        );
+
+        originalConsole.log(...args);
+
+    };
+
+
+    console.error = (...args) => {
+
+        printConsole(
+            formatArguments(args),
+            "error"
+        );
+
+        originalConsole.error(...args);
+
+    };
+
+
+    console.warn = (...args) => {
+
+        printConsole(
+            formatArguments(args),
+            "warn"
+        );
+
+        originalConsole.warn(...args);
+
+    };
+
+
+    console.info = (...args) => {
+
+        printConsole(
+            formatArguments(args),
+            "info"
+        );
+
+        originalConsole.info(...args);
+
+    };
+
+
+    console.table = (...args) => {
+
+        printConsole(
+            formatArguments(args),
+            "log"
+        );
+
+        originalConsole.table(...args);
+
+    };
+
+
+    try {
+
+        /*
+         * Function constructor provides a clean execution scope.
+         *
+         * NOTE:
+         * This is intentionally a browser JavaScript runner.
+         * Do not execute untrusted code that you do not understand.
+         */
+
+        const execute = new Function(code);
+
+        const result = execute();
+
+        if (result !== undefined) {
+
+            printConsole(
+                "↳ " + formatArguments([result]),
+                "result"
+            );
+
+        }
+
+        printConsole(
+            "✓ Finished successfully.",
+            "result"
+        );
+
+    } catch (error) {
+
+        printConsole(
+            `${error.name}: ${error.message}`,
+            "error"
+        );
+
+        if (error.stack) {
+
+            printConsole(
+                error.stack,
+                "error"
+            );
+
+        }
+
+    } finally {
+
+        console.log = originalConsole.log;
+        console.error = originalConsole.error;
+        console.warn = originalConsole.warn;
+        console.info = originalConsole.info;
+        console.table = originalConsole.table;
+
+    }
+
+}
+
+
+/* ============================================================
+   CONSOLE
+   ============================================================ */
+
+function printConsole(message, type = "log") {
+
+    const output =
+        document.getElementById("consoleOutput");
+
+    const line =
+        document.createElement("div");
+
+    line.className =
+        "console-line console-" + type;
+
+    const time =
+        new Date().toLocaleTimeString();
+
+    line.innerHTML =
+        `<span class="console-time">${time}</span>${escapeHTML(message)}`;
+
+    output.appendChild(line);
+
+    output.scrollTop =
+        output.scrollHeight;
+
+}
+
+
+function clearConsole() {
+
+    document.getElementById("consoleOutput")
+        .innerHTML = "";
+
+}
+
+
+/* ============================================================
+   RENAME
+   ============================================================ */
+
+async function renameProgram() {
+
+    if (!currentProgramId) {
+        return;
+    }
+
+    const program =
+        database.programs[currentProgramId];
+
+    const name = await showCustomModal({
+        title: "Rename Program",
+        message: "Enter new program name:",
+        type: "prompt",
+        defaultValue: program.title
+    });
+
+    if (name === null) {
+        return;
+    }
+
+    program.title =
+        name.trim() || "Untitled Program";
+
+    program.updatedAt =
+        new Date().toISOString();
+
+    saveDatabaseToLocalStorage();
+
+    document.getElementById("programTitle")
+        .value = program.title;
+
+    renderProgramList();
+
+}
+
+
+/* ============================================================
+   DUPLICATE
+   ============================================================ */
+
+function duplicateProgram() {
+
+    if (!currentProgramId) {
+        return;
+    }
+
+    const original =
+        database.programs[currentProgramId];
+
+    const id =
+        generateProgramId();
+
+    database.programs[id] = {
+
+        ...original,
+
+        id: id,
+
+        title: original.title + " Copy",
+
+        createdAt: new Date().toISOString(),
+
+        updatedAt: new Date().toISOString(),
+
+        runCount: 0
+
+    };
+
+    saveDatabaseToLocalStorage();
+
+    loadProgram(id);
+
+}
+
+
+/* ============================================================
+   DELETE
+   ============================================================ */
+
+async function deleteProgram(id = currentProgramId) {
+
+    if (!id) {
+        return;
+    }
+
+    const program =
+        database.programs[id];
+
+    if (!program) {
+        return;
+    }
+
+    const confirmed = await showCustomModal({
+        title: "Delete Program",
+        message: `Delete "${program.title}"?\n\nThis cannot be undone unless you have exported your JSON backup.`,
+        type: "confirm"
+    });
+
+    if (!confirmed) {
+        return;
+    }
+
+    delete database.programs[id];
+
+    saveDatabaseToLocalStorage();
+
+    const remaining =
+        Object.keys(database.programs);
+
+    if (remaining.length > 0) {
+
+        if (currentProgramId === id) {
+            loadProgram(remaining[0]);
+        }
+
+    } else {
+
+        createInitialProgram();
+
+        loadProgram(currentProgramId);
+
+    }
+
+    renderProgramList();
+
+}
+
+
+/* ============================================================
+   DOWNLOAD CURRENT JS
+   ============================================================ */
+
+function downloadJS() {
+
+    if (!currentProgramId) {
+        return;
+    }
+
+    const program =
+        database.programs[currentProgramId];
+
+    const code =
+        editor.getValue();
+
+    const blob =
+        new Blob(
+            [code],
+            {
+                type: "text/javascript"
+            }
+        );
+
+    const url =
+        URL.createObjectURL(blob);
+
+    const a =
+        document.createElement("a");
+
+    a.href = url;
+
+    a.download =
+        sanitizeFilename(program.title) + ".js";
+
+    a.click();
+
+    URL.revokeObjectURL(url);
+
+}
+
+
+function sanitizeFilename(name) {
+
+    return name
+        .replace(/[<>:"/\\|?*]/g, "_")
+        .trim()
+        || "program";
+
+}
+
+
+/* ============================================================
+   EXPORT JSON
+   ============================================================ */
+
+function exportJSON() {
+
+    /*
+     * Always save the latest editor content first.
+     */
+
+    if (currentProgramId) {
+        saveProgram();
+    }
+
+
+    const json =
+        JSON.stringify(
+            database,
+            null,
+            2
+        );
+
+
+    const blob =
+        new Blob(
+            [json],
+            {
+                type: "application/json"
+            }
+        );
+
+
+    const url =
+        URL.createObjectURL(blob);
+
+
+    const a =
+        document.createElement("a");
+
+    a.href = url;
+
+    a.download =
+        "js-practice-database.json";
+
+    a.click();
+
+    URL.revokeObjectURL(url);
+
+}
+
+
+/* ============================================================
+   IMPORT JSON
+   ============================================================ */
+
+function importJSON() {
+
+    document.getElementById("jsonFileInput")
+        .click();
+
+}
+
+
+async function handleJSONImport(event) {
+
+    const file =
+        event.target.files[0];
+
+    if (!file) {
+        return;
+    }
+
+
+    const reader =
+        new FileReader();
+
+
+    reader.onload = async function(e) {
+
+        try {
+
+            const imported =
+                JSON.parse(e.target.result);
+
+
+            if (
+                !imported ||
+                !imported.programs ||
+                typeof imported.programs !== "object"
+            ) {
+
+                throw new Error(
+                    "Invalid JS Practice Compiler JSON file."
+                );
+
+            }
+
+
+            const confirmed = await showCustomModal({
+                title: "Import Database",
+                message: "Import this database?\n\nThis will replace the programs currently loaded in the app.",
+                type: "confirm"
+            });
+
+            if (!confirmed) {
+                return;
+            }
+
+
+            database = imported;
+
+            saveDatabaseToLocalStorage();
+
+
+            const ids =
+                Object.keys(database.programs);
+
+
+            if (ids.length > 0) {
+
+                loadProgram(ids[0]);
+
+            } else {
+
+                createInitialProgram();
+
+                loadProgram(currentProgramId);
+
+            }
+
+
+            renderProgramList();
+
+            await showCustomModal({
+                title: "Success",
+                message: "Database imported successfully.",
+                type: "alert"
+            });
+
+        } catch (error) {
+
+            await showCustomModal({
+                title: "Error",
+                message: "Could not import JSON:\n\n" + error.message,
+                type: "alert"
+            });
+
+        }
+
+        // Reset the file input so the same file can be selected again
+        event.target.value = '';
+
+    };
+
+
+    reader.readAsText(file);
+
+    event.target.value = "";
+
+}
+
+
+/* ============================================================
+   FILE SYSTEM ACCESS API
+   ============================================================ */
+
+/*
+ * Chrome / Edge support this API.
+ *
+ * This lets you choose ONE real JSON file.
+ *
+ * Example:
+ *
+ * js-practice-database.json
+ *
+ * The app can then write your programs into that file.
+ */
+
+
+/* OPEN REAL JSON FILE */
+
+async function openDatabaseFile() {
+
+    if (!window.showOpenFilePicker) {
+
+        alert(
+            "Your browser does not support direct JSON file access.\n\nUse Chrome or Edge, or use Import/Export JSON."
+        );
+
+        return;
+
+    }
+
+
+    try {
+
+        const [handle] =
+            await window.showOpenFilePicker({
+                types: [
+                    {
+                        description:
+                            "JSON Database",
+                        accept: {
+                            "application/json":
+                                [".json"]
+                        }
+                    }
+                ],
+
+                multiple: false
+            });
+
+
+        databaseFileHandle =
+            handle;
+
+
+        const file =
+            await handle.getFile();
+
+
+        const text =
+            await file.text();
+
+
+        const imported =
+            JSON.parse(text);
+
+
+        if (
+            !imported ||
+            !imported.programs
+        ) {
+
+            throw new Error(
+                "Invalid database file."
+            );
+
+        }
+
+
+        database =
+            imported;
+
+
+        saveDatabaseToLocalStorage();
+
+
+        const ids =
+            Object.keys(database.programs);
+
+
+        if (ids.length > 0) {
+
+            loadProgram(ids[0]);
+
+        }
+
+
+        renderProgramList();
+
+
+        alert(
+            "JSON database connected successfully."
+        );
+
+    } catch (error) {
+
+        if (error.name !== "AbortError") {
+
+            alert(
+                "Could not open database:\n\n" +
+                error.message
+            );
+
+        }
+
+    }
+
+}
+
+
+/* SAVE TO REAL JSON FILE */
+
+async function saveDatabaseFile() {
+
+    if (!databaseFileHandle) {
+
+        if (!window.showSaveFilePicker) {
+
+            exportJSON();
+
+            return;
+
+        }
+
+
+        try {
+
+            databaseFileHandle =
+                await window.showSaveFilePicker({
+
+                    suggestedName:
+                        "js-practice-database.json",
+
+                    types: [
+                        {
+                            description:
+                                "JSON Database",
+
+                            accept: {
+                                "application/json":
+                                    [".json"]
+                            }
+                        }
+                    ]
+
+                });
+
+        } catch (error) {
+
+            if (error.name !== "AbortError") {
+
+                alert(error.message);
+
+            }
+
+            return;
+
+        }
+
+    }
+
+
+    try {
+
+        /*
+         * Save latest editor changes.
+         */
+
+        if (currentProgramId) {
+
+            const program =
+                database.programs[currentProgramId];
+
+            program.code =
+                editor.getValue();
+
+            program.title =
+                document.getElementById("programTitle")
+                    .value.trim()
+                    || "Untitled Program";
+
+            program.updatedAt =
+                new Date().toISOString();
+
+        }
+
+
+        const writable =
+            await databaseFileHandle
+                .createWritable();
+
+
+        await writable.write(
+            JSON.stringify(
+                database,
+                null,
+                2
+            )
+        );
+
+
+        await writable.close();
+
+
+        saveDatabaseToLocalStorage();
+
+
+        dirty = false;
+
+        showSaveStatus(
+            "Saved to JSON file"
+        );
+
+
+    } catch (error) {
+
+        alert(
+            "Could not save JSON file:\n\n" +
+            error.message
+        );
+
+    }
+
+}
+
+
+/* ============================================================
+   THEME
+   ============================================================ */
+
+function toggleTheme() {
+
+    document.body.classList.toggle("dark");
+
+    const isDark =
+        document.body.classList.contains("dark");
+
+    localStorage.setItem(
+        "js_compiler_theme",
+        isDark ? "dark" : "light"
+    );
+
+
+    if (editor) {
+
+        editor.setOption(
+            "theme",
+            isDark ? "dracula" : "default"
+        );
+
+    }
+
+}
+
+
+function loadTheme() {
+
+    const theme =
+        localStorage.getItem(
+            "js_compiler_theme"
+        );
+
+    if (theme === "dark") {
+
+        document.body.classList.add("dark");
+
+    }
+
+}
+
+
+/* ============================================================
+   KEYBOARD SHORTCUTS
+   ============================================================ */
+
+function setupKeyboardShortcuts() {
+
+    document.addEventListener(
+        "keydown",
+        event => {
+
+            /*
+             * Ctrl + S
+             */
+
+            if (
+                (event.ctrlKey || event.metaKey) &&
+                event.key.toLowerCase() === "s"
+            ) {
+
+                event.preventDefault();
+
+                saveProgram();
+
+            }
+
+
+            /*
+             * Ctrl + Enter
+             */
+
+            if (
+                (event.ctrlKey || event.metaKey) &&
+                event.key === "Enter"
+            ) {
+
+                event.preventDefault();
+
+                runCode();
+
+            }
+
+
+            /*
+             * Escape modal
+             */
+
+            if (
+                event.key === "Escape"
+            ) {
+
+                closeNewModal();
+
+            }
+
+        }
+    );
+
+
+    document
+        .getElementById("newProgramName")
+        .addEventListener(
+            "keydown",
+            event => {
+
+                if (event.key === "Enter") {
+
+                    createProgram();
+
+                }
+
+            }
+        );
+
+}
+
+
+/* ============================================================
+   EDITOR STATS
+   ============================================================ */
+
+function updateEditorStats() {
+
+    if (!editor) {
+        return;
+    }
+
+    const code =
+        editor.getValue();
+
+    document.getElementById("charCount")
+        .textContent =
+        code.length + " chars";
+
+}
+
+
+function updateCursorPosition() {
+
+    if (!editor) {
+        return;
+    }
+
+    const cursor =
+        editor.getCursor();
+
+    document.getElementById("cursorPosition")
+        .textContent =
+        `Ln ${cursor.line + 1}, Col ${cursor.ch + 1}`;
+
+}
+
+
+/* ============================================================
+   AUTO SAVE BEFORE CLOSING
+   ============================================================ */
+
+window.addEventListener(
+    "beforeunload",
+    () => {
+
+        if (currentProgramId) {
+
+            const program =
+                database.programs[currentProgramId];
+
+            program.code =
+                editor.getValue();
+
+            program.title =
+                document.getElementById("programTitle")
+                    .value.trim()
+                    || "Untitled Program";
+
+            program.updatedAt =
+                new Date().toISOString();
+
+            saveDatabaseToLocalStorage();
+
+        }
+
+    }
+);
+
+
+/* ============================================================
+   WINDOW RESIZE
+   ============================================================ */
+
+window.addEventListener(
+    "resize",
+    () => {
+
+        if (editor) {
+            editor.refresh();
+        }
+
+    }
+);
+
+
+/* ============================================================
+   OPTIONAL: DRAG RESIZE CONSOLE
+   ============================================================ */
+
+/*
+ * Add a small drag handle to the console.
+ */
+
+const consoleElement =
+    document.querySelector(".console");
+
+const editorArea =
+    document.querySelector(".editor-area");
+
+let resizing = false;
+
+
+/*
+ * Create resize handle.
+ */
+
+const resizeHandle =
+    document.createElement("div");
+
+resizeHandle.style.position = "absolute";
+resizeHandle.style.top = "-4px";
+resizeHandle.style.left = "0";
+resizeHandle.style.right = "0";
+resizeHandle.style.height = "8px";
+resizeHandle.style.cursor = "ns-resize";
+resizeHandle.style.zIndex = "10";
+
+consoleElement.style.position = "relative";
+
+consoleElement.prepend(resizeHandle);
+
+
+resizeHandle.addEventListener(
+    "mousedown",
+    () => {
+
+        resizing = true;
+
+        document.body.style.cursor =
+            "ns-resize";
+
+    }
+);
+
+
+document.addEventListener(
+    "mousemove",
+    event => {
+
+        if (!resizing) {
+            return;
+        }
+
+        const main =
+            document.querySelector(".main");
+
+        const rect =
+            main.getBoundingClientRect();
+
+        let height =
+            rect.bottom - event.clientY;
+
+        height =
+            Math.max(
+                130,
+                Math.min(
+                    600,
+                    height
+                )
+            );
+
+        consoleElement.style.height =
+            height + "px";
+
+    }
+);
+
+
+document.addEventListener(
+    "mouseup",
+    () => {
+
+        if (!resizing) {
+            return;
+        }
+
+        resizing = false;
+
+        document.body.style.cursor =
+            "";
+
+        if (editor) {
+            editor.refresh();
+        }
+
+    }
+);
+
+
+/* ============================================================
+   INITIAL CONSOLE MESSAGE
+   ============================================================ */
+
+setTimeout(() => {
+
+    printConsole(
+        "JavaScript Practice Compiler ready.",
+        "info"
+    );
+
+    printConsole(
+        "Press Ctrl + Enter to run your code.",
+        "info"
+    );
+
+}, 500);
+
+</script>
+
+</body>
+</html>

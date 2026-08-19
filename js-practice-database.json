@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "app": "JS Practice Compiler",
+  "programs": {
+    "js_0001": {
+      "id": "js_0001",
+      "title": "Hello JavaScript",
+      "language": "javascript",
+      "code": "// Welcome to JS Practice Compiler 🚀\n\nconsole.log(\"Hello JavaScript!\");\n\nconst numbers = [1, 2, 3, 4, 5];\n\nconst doubled = numbers.map(n => n * 2);\n\nconsole.log(\"Original:\", numbers);\nconsole.log(\"Doubled:\", doubled);\n",
+      "createdAt": "2026-08-18T16:41:45.533Z",
+      "updatedAt": "2026-08-18T16:44:02.826Z",
+      "runCount": 1,
+      "lastRunAt": "2026-08-18T16:41:57.576Z"
+    }
+  }
+}
